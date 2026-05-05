@@ -1,0 +1,61 @@
+name: Manual-Trigger-To-Extract-From-Dev-APIM
+run-name: Manual-Trigger-To-Extract-From-Dev-APIM
+#martin francis kallukalam
+on:
+  workflow_dispatch:
+    inputs:
+      EXTRACTOR_OPTION:
+        description: 'Choose whether to extract all OR selected artifacts from extractor config file'     
+        required: true
+        type: choice
+        options:
+        - 'Extract Selected APIM Artifacts'
+      API_SPECIFICATION_FORMAT:
+        description: 'API specification format to extract the API spec'     
+        required: true
+        type: choice
+        options:
+        - OpenAPIV3Yaml 
+        - OpenAPIV3Json
+        - OpenAPIV2Yaml
+        - OpenAPIV2Json
+        default: OpenAPIV3Yaml
+      REFERENCE_NUMBER:
+        description: 'Reference(ticket) number to include in the title of PR and milestone.'     
+        required: true
+        type: string
+      BRANCH_TO_EXTRACT_ARTIFACTS:
+        description: 'Enter the branch (head branch of PR) where artifacts should be extracted from APIM.'     
+        required: true
+        type: choice
+        default: "working"
+        options:
+        - "working"
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+concurrency:
+ group: extract-artifacts-from-dev-apim
+ cancel-in-progress: false
+env:
+  APIOPS_WORKFLOW_REPO: 'martin2176/ecs-apim-workflows'
+  BASE_BRANCH_FOR_PR: 'main'
+  HEAD_BRANCH_FOR_PR: ${{ github.event.inputs.BRANCH_TO_EXTRACT_ARTIFACTS }}
+#The below values are used in calling the reusable workflow. but not referenced as env variables
+#since with clause doesnt support env variables
+# BRANCH_FOR_EXTRACTOR_CONFIG: main
+# API_MANAGEMENT_ENVIRONMENT: dev
+# CONFIGURATION_YAML_PATH: configuration-extractor-dev.yml
+jobs:
+    Extract-Artifacts-from-Dev-APIM:
+     uses: martin2176/ecs-apim-workflows/.github/workflows/extract-from-dev-apim.yml@main
+     with:
+      EXTRACTOR_OPTION: ${{ inputs.EXTRACTOR_OPTION }} 
+      API_SPECIFICATION_FORMAT: ${{ inputs.API_SPECIFICATION_FORMAT }} 
+      REFERENCE_NUMBER: ${{ inputs.REFERENCE_NUMBER }} 
+      BRANCH_FOR_EXTRACTOR_CONFIG: main
+      BASE_BRANCH_FOR_PR: main
+      HEAD_BRANCH_FOR_PR: ${{ github.event.inputs.BRANCH_TO_EXTRACT_ARTIFACTS }}
+      CONFIGURATION_YAML_PATH: configuration-extractor-dev.yml
+      API_MANAGEMENT_ENVIRONMENT: dev

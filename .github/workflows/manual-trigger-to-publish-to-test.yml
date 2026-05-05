@@ -1,0 +1,39 @@
+name: Manual-Trigger-To-Publish-to-Test-APIM
+run-name: Manual-Trigger-To-Publish-to-Test-APIM
+#martin francis kallukalam
+on:
+  workflow_dispatch:
+    inputs:
+     MILESTONE_TITLE:
+        description: 'Enter Milestone to deploy.'     
+        required: true
+        type: string
+     BRANCH_TO_DEPLOY_FROM:
+      description: 'Branch to deploy APIM artifacts from.'     
+      required: true
+      type: choice
+      default: "main"
+      options:
+       - "main"
+concurrency:
+ group: publish-to-test-apim-instance
+ cancel-in-progress: false
+permissions:
+  contents: write
+  id-token: write
+env:
+  APIOPS_WORKFLOW_REPO: 'martin2176/ecs-apim-workflows'
+jobs:
+    Notify-MS-Teams:
+     name: Notify-MS-Teams
+     uses: martin2176/ecs-apim-workflows/.github/workflows/msteams-notification.yml@main
+     with:
+      CHANNEL_NAME: "TEST_DEPLOYMENT_CHANNEL"
+      MESSAGE_TITLE: "Deployment in Progress."
+      MESSAGE_BODY: "There is a Deployment to Test In Progress.Access the Workflow at: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+    Publish-Artifacts-to-Test-APIM:
+     uses: martin2176/ecs-apim-workflows/.github/workflows/publish-to-test-matrix-controller.yml@main
+     with:
+      MILESTONE_TITLE: ${{ inputs.MILESTONE_TITLE }}
+      API_MANAGEMENT_ENVIRONMENT: test
+      BRANCH_TO_DEPLOY_FROM: ${{ inputs.BRANCH_TO_DEPLOY_FROM }}

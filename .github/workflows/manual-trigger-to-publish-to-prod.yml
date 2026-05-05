@@ -1,0 +1,69 @@
+name: Manual-Trigger-To-Publish-to-Prod-APIM
+run-name: Manual-Trigger-To-Publish-to-Prod-APIM
+#martin francis kallukalam
+on:
+  workflow_dispatch:
+    inputs:
+     MILESTONE_TITLE:
+        description: 'Enter Milestone to deploy.'     
+        required: true
+        type: string
+     BRANCH_TO_DEPLOY_FROM:
+      description: 'Branch to deploy APIM artifacts from.'     
+      required: true
+      type: choice
+      default: "main"
+      options:
+       - "main"
+     API_NAME_FOR_REVISIONING:
+      description: |
+       Only Applicable for Prod. Enter Name of API to create a backup Revision.
+       Leave as default(null) if you are not deploying an API or you are not deploying into Prod
+       or you do not want to create a backup revision.       
+      required: false
+      type: string
+     DRY_RUN:
+      description: |
+       Do you want to run in Dry Run Mode ?
+       (Dry run Mode is only applicable for Production and will be skipped for Dev, Test)
+      required: true
+      type: choice
+      default: "no"
+      options:
+       - "no"
+       - "yes"
+
+concurrency:
+ group: publish-to-prod-apim-instance
+ cancel-in-progress: false
+permissions:
+  contents: read
+  id-token: write
+env:
+  APIOPS_WORKFLOW_REPO: 'martin2176/ecs-apim-workflows'
+jobs:
+    Notify-MS-Teams:
+     name: Notify-MS-Teams
+     uses: martin2176/ecs-apim-workflows/.github/workflows/msteams-notification.yml@main
+     with:
+      CHANNEL_NAME: "PROD_DEPLOYMENT_CHANNEL"
+      MESSAGE_TITLE: "Deployment waiting for Approval."
+      MESSAGE_BODY: "There is a Deployment to Prod APIM Instance waiting for Approval.Access the Workflow at: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+
+    Create-Backup-Revision-and-Delete-Older-Revisions:
+     if: ${{ inputs.DRY_RUN == 'no' }}
+     uses: martin2176/ecs-apim-workflows/.github/workflows/publish-to-prod-api-revision-management.yml@main
+     with:
+      REVISION_ID: ${{ inputs.MILESTONE_TITLE }}
+      API_MANAGEMENT_ENVIRONMENT: prod
+      API_NAME_FOR_REVISIONING: ${{ inputs.API_NAME_FOR_REVISIONING }}
+
+    Publish-Artifacts-to-Prod-APIM:
+     if: ${{ !failure() && !cancelled() }}
+     needs: Create-Backup-Revision-and-Delete-Older-Revisions
+     uses: martin2176/ecs-apim-workflows/.github/workflows/publish-to-prod-matrix-controller.yml@main
+     with:
+      MILESTONE_TITLE: ${{ inputs.MILESTONE_TITLE }}
+      API_MANAGEMENT_ENVIRONMENT: prod
+      BRANCH_TO_DEPLOY_FROM: ${{ inputs.BRANCH_TO_DEPLOY_FROM }}
+      DRY_RUN: ${{ inputs.DRY_RUN }}

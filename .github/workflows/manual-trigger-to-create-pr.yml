@@ -1,0 +1,34 @@
+name: Manual-Trigger-To-Create-PullRequest
+run-name: Manual-Trigger-To-Create-PullRequest
+#martin francis kallukalam
+on:
+  workflow_dispatch:
+    inputs:
+      REFERENCE_NUMBER:
+        description: 'Reference(ticket) number to include in the title of PR and milestone.'     
+        required: true
+        type: string
+      BASE_BRANCH_FOR_PR:
+        description: 'Enter the base branch of PR (target branch).'     
+        required: true
+        type: choice
+        default: "main"
+        options:
+        - "main"
+      HEAD_BRANCH_FOR_PR:
+        description: 'Enter the head branch (source branch) of PR. This is the feature/developer branch'     
+        required: true
+        type: string
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+env:
+  APIOPS_WORKFLOW_REPO: 'martin2176/ecs-apim-workflows'
+jobs:
+    Create-PR-From-Developer-Branch:
+     uses: martin2176/ecs-apim-workflows/.github/workflows/create-pr-from-developer-branch.yml@main
+     with:
+      REFERENCE_NUMBER: ${{ inputs.REFERENCE_NUMBER }} 
+      BASE_BRANCH_FOR_PR: ${{ inputs.BASE_BRANCH_FOR_PR }}
+      HEAD_BRANCH_FOR_PR: ${{ inputs.HEAD_BRANCH_FOR_PR }}

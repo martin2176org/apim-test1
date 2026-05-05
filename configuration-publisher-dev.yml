@@ -1,0 +1,10 @@
+apis:
+  - name: name-of-api
+    properties:
+      # serviceUrl must remain at root level (no path segments) to prevent
+      # interference with context.Request.Url.Path in policy expressions.
+      # When set to empty/blank, APIM will use the first server URL from specification.yaml:
+      #   servers:
+      #     - url: https://apis.dev.ferguson.com/some/api/path
+      # Actual backend routing should be configured via named values or backend objects.
+      serviceUrl: "https://no-path.example.com"

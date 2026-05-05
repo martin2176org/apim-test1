@@ -1,0 +1,14 @@
+apis:
+  - name-of-api
+versionSets: []
+workspaces: []
+backends: []
+namedValues: []
+products: []
+subscriptions: []
+tags: []
+policyFragments: []
+groups: []
+loggers: []
+diagnostics: []
+gateways: []

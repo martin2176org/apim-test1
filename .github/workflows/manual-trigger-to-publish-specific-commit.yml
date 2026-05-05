@@ -1,0 +1,138 @@
+name: Manual-Trigger-To-Publish-Specific-Commit
+run-name: Manual-Trigger-To-Publish-Specific-Commit
+#martin francis kallukalam
+#This will deploy artifacts which are delta between the specified commit and the previous commits
+#This should not be used as a regular deployment mechanism
+#This should only be used to redeploy any specific commit
+on:
+  workflow_dispatch:
+    inputs:
+     PUBLISH_ARTIFACTS_CHOICE:
+      description: 'Choose from list of option(s)'
+      required: true
+      type: choice
+      default: "publish-delta-artifacts-in-specific-commit"
+      options:
+       - "publish-delta-artifacts-in-specific-commit"
+     COMMITID_TO_PUBLISH:
+      description: 'Enter specific Commit ID (full long commit id) for publishing artifacts'     
+      required: true
+      type: string
+     BRANCH_TO_DEPLOY_FROM:
+      description: 'Branch to deploy APIM artifacts from.'     
+      required: true
+      type: choice
+      default: "main"
+      options:
+       - "main"
+     API_MANAGEMENT_ENVIRONMENT:
+      description: 'Choose the APIM Environment'     
+      required: true
+      type: choice
+      default: "dev"
+      options:
+       - "dev"
+       - "test"
+       - "prod"
+     REFERENCE_NUMBER:
+      description: |
+       Reference Number for this Deployment.
+       This will be used in Job Summary. If Deploying to Prod, this will be used to name API Revision as well.
+      required: true
+      type: string
+     API_NAME_FOR_REVISIONING:
+      description: |
+       Only Applicable for Prod. Enter Name of API to create a backup Revision.
+       Leave as default(null) if you are not deploying an API or you are not deploying into Prod
+       or you do not want to create a backup revision.
+      required: false
+      type: string
+     DRY_RUN:
+      description: |
+       Do you want to run in Dry Run Mode ?
+       (Dry run Mode is only applicable for Production and will be skipped for Dev, Test)
+      required: true
+      type: choice
+      default: "no"
+      options:
+       - "no"
+       - "yes"
+       
+concurrency:
+ group: publish-to-${{ inputs.API_MANAGEMENT_ENVIRONMENT }}-apim-instance
+ cancel-in-progress: false
+permissions:
+  contents: write
+  id-token: write
+env:
+  APIOPS_WORKFLOW_REPO: 'martin2176/ecs-apim-workflows'
+jobs:
+    Notify-MS-Teams-Test-Channel:
+     name: Notify-MS-Teams-Test-Channel
+     if: ${{ inputs.API_MANAGEMENT_ENVIRONMENT  == 'test' }}
+     uses: martin2176/ecs-apim-workflows/.github/workflows/msteams-notification.yml@main
+     with:
+      CHANNEL_NAME: "TEST_DEPLOYMENT_CHANNEL"
+      MESSAGE_TITLE: "Deployment in Progress."
+      MESSAGE_BODY: "There is a Deployment to Test In Progress.Access the Workflow at: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+
+    Notify-MS-Teams-Prod-Channel:
+     name: Notify-MS-Teams-Prod-Channel
+     if: ${{ inputs.API_MANAGEMENT_ENVIRONMENT  == 'prod' }}
+     uses: martin2176/ecs-apim-workflows/.github/workflows/msteams-notification.yml@main
+     with:
+      CHANNEL_NAME: "PROD_DEPLOYMENT_CHANNEL"
+      MESSAGE_TITLE: "Deployment waiting for Approval."
+      MESSAGE_BODY: "There is a Deployment to Prod APIM Instance waiting for Approval.Access the Workflow at: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>"      
+
+    Publish-Specific-Commit-to-Dev-APIM:
+     if: ${{ inputs.API_MANAGEMENT_ENVIRONMENT  == 'dev' }}
+     name: Publish-All-Artifacts-to-Dev-APIM
+     uses: martin2176/ecs-apim-workflows/.github/workflows/publish-to-dev-apim-specific-commit-artifacts.yml@main
+     with:
+      COMMITID: ${{ inputs.COMMITID_TO_PUBLISH }}
+      PUBLISH_ARTIFACTS_CHOICE: ${{ inputs.PUBLISH_ARTIFACTS_CHOICE }}
+      API_MANAGEMENT_SERVICE_OUTPUT_FOLDER_PATH: apimartifacts
+      CONFIGURATION_YAML_PATH: configuration-publisher-dev.yml
+      API_MANAGEMENT_ENVIRONMENT: dev
+      BRANCH_TO_DEPLOY_FROM: ${{ inputs.BRANCH_TO_DEPLOY_FROM }} 
+      BRANCH_FOR_PUBLISHER_CONFIG: main
+      REFERENCE_NUMBER: ${{ inputs.REFERENCE_NUMBER }}
+      
+    Publish-Specific-Commit-to-Test-APIM:
+     if: ${{ inputs.API_MANAGEMENT_ENVIRONMENT  == 'test' }}
+     name: Publish-All-Artifacts-to-Test-APIM
+     uses: martin2176/ecs-apim-workflows/.github/workflows/publish-to-test-apim-specific-commit-artifacts.yml@main
+     with:
+      COMMITID: ${{ inputs.COMMITID_TO_PUBLISH }} 
+      PUBLISH_ARTIFACTS_CHOICE: ${{ inputs.PUBLISH_ARTIFACTS_CHOICE }}
+      API_MANAGEMENT_SERVICE_OUTPUT_FOLDER_PATH: apimartifacts
+      CONFIGURATION_YAML_PATH: configuration-publisher-test.yml
+      API_MANAGEMENT_ENVIRONMENT: test
+      BRANCH_TO_DEPLOY_FROM: ${{ inputs.BRANCH_TO_DEPLOY_FROM }} 
+      BRANCH_FOR_PUBLISHER_CONFIG: main
+      REFERENCE_NUMBER: ${{ inputs.REFERENCE_NUMBER }}
+
+    Create-Backup-Revision-and-Delete-Older-Revisions:
+     if: ${{ inputs.API_MANAGEMENT_ENVIRONMENT  == 'prod' && inputs.DRY_RUN == 'no' }}
+     uses: martin2176/ecs-apim-workflows/.github/workflows/publish-to-prod-api-revision-management.yml@main
+     with:
+      REVISION_ID: ${{ inputs.COMMITID_TO_PUBLISH }} 
+      API_MANAGEMENT_ENVIRONMENT: prod
+      API_NAME_FOR_REVISIONING: ${{ inputs.API_NAME_FOR_REVISIONING }}
+      
+    Publish-Specific-Commit-to-Prod-APIM:
+     needs: Create-Backup-Revision-and-Delete-Older-Revisions
+     if: ${{ !failure() && !cancelled() && inputs.API_MANAGEMENT_ENVIRONMENT  == 'prod' }}
+     name: Publish-All-Artifacts-to-Prod-APIM
+     uses: martin2176/ecs-apim-workflows/.github/workflows/publish-to-prod-apim-specific-commit-artifacts.yml@main
+     with:
+      COMMITID: ${{ inputs.COMMITID_TO_PUBLISH }} 
+      PUBLISH_ARTIFACTS_CHOICE: ${{ inputs.PUBLISH_ARTIFACTS_CHOICE }}
+      API_MANAGEMENT_SERVICE_OUTPUT_FOLDER_PATH: apimartifacts
+      CONFIGURATION_YAML_PATH: configuration-publisher-prod.yml
+      API_MANAGEMENT_ENVIRONMENT: prod
+      BRANCH_TO_DEPLOY_FROM: ${{ inputs.BRANCH_TO_DEPLOY_FROM }} 
+      BRANCH_FOR_PUBLISHER_CONFIG: main
+      REFERENCE_NUMBER: ${{ inputs.REFERENCE_NUMBER }}
+      DRY_RUN: ${{ inputs.DRY_RUN }}

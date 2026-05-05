@@ -1,0 +1,52 @@
+name: PRMerge-Trigger-To-Publish-to-Dev-APIM
+run-name: PRMerge-Trigger-To-Publish-to-Dev-APIM
+#author martin francis kallukalam
+on:
+   pull_request:
+    branches: [main]
+    types: [closed]
+    paths: 
+     - 'apimartifacts/**'
+concurrency:
+ group: publish-to-dev-apim-instance
+ cancel-in-progress: false
+permissions:
+  contents: write
+  id-token: write
+jobs:
+    Prerequisite-Check:
+     if:  ${{ (github.event_name == 'pull_request' && github.event.pull_request.merged == true) }}
+     name: Prerequisite-Check
+     uses: martin2176/ecs-apim-workflows/.github/workflows/prereqcheck-before-publish-to-dev-apim-on-pr-merge-trigger.yml@main
+     with:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      MILESTONE_NUMBER: ${{ github.event.pull_request.milestone.number }}
+      MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
+      PR_MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_STATE: ${{ github.event.pull_request.state }}
+      PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+      PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+   
+    Publish-Artifacts-to-Dev-APIM:
+     name: Publish-Artifacts-to-Dev-APIM
+     needs: Prerequisite-Check
+     uses: martin2176/ecs-apim-workflows/.github/workflows/publish-to-dev-apim.yml@main
+     with:
+      COMMITID: ${{ github.event.pull_request.merge_commit_sha }}
+      PUBLISH_ARTIFACTS_CHOICE: "publish-delta-artifacts-in-specific-commit"
+      API_MANAGEMENT_SERVICE_OUTPUT_FOLDER_PATH: apimartifacts
+      CONFIGURATION_YAML_PATH: configuration-publisher-dev.yml
+      API_MANAGEMENT_ENVIRONMENT: dev
+      BRANCH_TO_DEPLOY_FROM: main
+      BRANCH_FOR_PUBLISHER_CONFIG: main
+      MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
+      
+    Tag-Commit-On-Successful-Publish:
+     name: Tag-Commit-On-Successful-Publish
+     needs: [Prerequisite-Check, Publish-Artifacts-to-Dev-APIM]
+     uses: martin2176/ecs-apim-workflows/.github/workflows/tag-commit-on-successful-publish.yml@main
+     with:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
+      PR_MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
