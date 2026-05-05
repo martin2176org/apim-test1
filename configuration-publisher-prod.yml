@@ -1,5 +1,5 @@
 apis:
-  - name: name-of-api
+  - name: apim-test1
     properties:
       # serviceUrl must remain at root level (no path segments) to prevent
       # interference with context.Request.Url.Path in policy expressions.

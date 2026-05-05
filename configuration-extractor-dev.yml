@@ -1,5 +1,5 @@
 apis:
-  - name-of-api
+  - apim-test1
 versionSets: []
 workspaces: []
 backends: []
